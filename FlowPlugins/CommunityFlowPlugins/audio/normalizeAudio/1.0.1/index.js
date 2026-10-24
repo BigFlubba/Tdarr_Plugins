@@ -113,7 +113,7 @@ var details = function () { return ({
 exports.details = details;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function () {
-    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, detectedFormatGroup, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, normArgs2, cli2, res2;
+    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, isMatroskaWebm, detectedFormatGroup, outputFilePath, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, normArgs2, cli2, res2;
     var _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
@@ -148,10 +148,17 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                     { names: ['matroska'], extension: 'mkv' },
                     { names: ['webm'], extension: 'webm' },
                 ];
-                detectedFormatGroup = formatGroups.find(function (group) {
-                    return group.names.some(function (name) { return sourceFormatNames.includes(name); });
-                });
-                if (detectedFormatGroup) {
+                isMatroskaWebm = sourceFormatNames.includes('matroska')
+                    && sourceFormatNames.includes('webm');
+                detectedFormatGroup = isMatroskaWebm
+                    ? undefined
+                    : formatGroups.find(function (group) {
+                        return group.names.some(function (name) { return sourceFormatNames.includes(name); });
+                    });
+                if (isMatroskaWebm) {
+                    outputContainer = container.toLowerCase().replace(/^\./, '') === 'webm' ? 'webm' : 'mkv';
+                }
+                else if (detectedFormatGroup) {
                     outputContainer = detectedFormatGroup.extension;
                 }
                 else if (sourceFormatNames.some(function (name) {
@@ -164,6 +171,7 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                     args.jobLog("Could not map detected container \"".concat(sourceFormatNames.join(','), "\" to a known extension; ")
                         + "keeping source extension \".".concat(outputContainer, "\"."));
                 }
+                outputFilePath = "".concat((0, fileUtils_1.getPluginWorkDir)(args), "/").concat((0, fileUtils_1.getFileName)(args.inputFileObj._id), ".").concat(outputContainer);
                 normArgs1 = [
                     '-i',
                     args.inputFileObj._id,

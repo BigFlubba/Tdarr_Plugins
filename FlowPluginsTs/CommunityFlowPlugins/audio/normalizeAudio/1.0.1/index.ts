@@ -108,7 +108,6 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
   // setup required variables
   const { i: inputs_i, lra: inputs_lra, tp: inputs_tp } = args.inputs;
   const maxGain = parseFloat(args.inputs.maxGain);
-
   const container = getContainer(args.inputFileObj._id);
   const probeData = args.inputFileObj.ffProbeData;
   const sourceFormatNames = String(probeData?.format?.format_name || '')
@@ -137,9 +136,17 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
     { names: ['matroska'], extension: 'mkv' },
     { names: ['webm'], extension: 'webm' },
   ];
-  const detectedFormatGroup = formatGroups.find((group) =>
-    group.names.some((name) => sourceFormatNames.includes(name)));
-  if (detectedFormatGroup) {
+  // FFprobe commonly reports WebM as "matroska,webm"; preserve a WebM
+  // extension when that is the actual input container.
+  const isMatroskaWebm = sourceFormatNames.includes('matroska')
+    && sourceFormatNames.includes('webm');
+  const detectedFormatGroup = isMatroskaWebm
+    ? undefined
+    : formatGroups.find((group) =>
+      group.names.some((name) => sourceFormatNames.includes(name)));
+  if (isMatroskaWebm) {
+    outputContainer = container.toLowerCase().replace(/^\./, '') === 'webm' ? 'webm' : 'mkv';
+  } else if (detectedFormatGroup) {
     outputContainer = detectedFormatGroup.extension;
   } else if (sourceFormatNames.some((name) =>
     ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'].includes(name))) {
@@ -151,6 +158,9 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
       + `keeping source extension ".${outputContainer}".`,
     );
   }
+
+  // This path is used by FFmpeg and returned to Tdarr as the plugin output.
+  const outputFilePath = `${getPluginWorkDir(args)}/${getFileName(args.inputFileObj._id)}.${outputContainer}`;
 
   const normArgs1: string[] = [
     '-i',
@@ -216,8 +226,7 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
 
   args.jobLog(`Loudnorm first pass values returned:  \n${JSON.stringify(loudNormValues)}`);
 
-  // Keep the source audio codec and bitrate where possible. The output retains
-  // the source container, so hardcoding AAC fails for containers such as MP3.
+  // Keep the source audio codec where it is compatible with the detected container.
   const audioStreamLine = res.errorLogFull.find((line) => /Stream #\d+:\d+.*Audio:/i.test(line));
   if (!audioStreamLine) {
     throw new Error('Failed to identify the source audio stream');
@@ -237,12 +246,12 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
   };
   const audioEncoder = audioEncoderByCodec[sourceAudioCodec] || sourceAudioCodec;
 
-// Use ffprobe's audio-stream bitrate, not the overall container bitrate or
-// text parsed from FFmpeg's human-readable log. ffprobe reports bit_rate in bps.
-const sourceAudioBitrate = Number(sourceAudioStream?.bit_rate);
-const sourceBitrateKbps = Number.isFinite(sourceAudioBitrate) && sourceAudioBitrate > 0
-  ? Math.round(sourceAudioBitrate / 1000)
-  : undefined;
+  // Use ffprobe's audio-stream bitrate, not the overall container bitrate or
+  // text parsed from FFmpeg's human-readable log. ffprobe reports bit_rate in bps.
+  const sourceAudioBitrate = Number(sourceAudioStream?.bit_rate);
+  const sourceBitrateKbps = Number.isFinite(sourceAudioBitrate) && sourceAudioBitrate > 0
+    ? Math.round(sourceAudioBitrate / 1000)
+    : undefined;
   const losslessCodecs = new Set([
     'flac', 'alac', 'tta', 'wavpack', 'ape',
     'pcm_s16le', 'pcm_s16be', 'pcm_s24le', 'pcm_s24be',
