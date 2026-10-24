@@ -291,11 +291,19 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
     };
   }
 
+  // The MP3 muxer supports audio only. Mapping every input stream (0) can
+  // make an MP4/DASH file with video, subtitles, or data streams fail even
+  // when its audio is successfully encoded with libmp3lame. For MP3 output,
+  // map only the first audio stream and explicitly select the MP3 muxer.
+  const outputMappingArgs = outputContainer === 'mp3'
+    ? ['-map', '0:a:0', '-vn', '-sn', '-dn']
+    : ['-map', '0'];
+  const outputFormatArgs = outputContainer === 'mp3' ? ['-f', 'mp3'] : [];
+
   const normArgs2 = [
     '-i',
     args.inputFileObj._id,
-    '-map',
-    '0',
+    ...outputMappingArgs,
     '-c',
     'copy',
     '-c:a',
@@ -307,6 +315,7 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
     + `measured_lra=${loudNormValues.input_lra}:`
     + `measured_tp=${loudNormValues.input_tp}:`
     + `measured_thresh=${loudNormValues.input_thresh}:offset=${loudNormValues.target_offset}`,
+    ...outputFormatArgs,
     outputFilePath,
   ];
 

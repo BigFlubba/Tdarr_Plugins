@@ -113,7 +113,7 @@ var details = function () { return ({
 exports.details = details;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function () {
-    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, isMatroskaWebm, detectedFormatGroup, mp4FamilyExtensions, outputFilePath, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, normArgs2, cli2, res2;
+    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, isMatroskaWebm, detectedFormatGroup, mp4FamilyExtensions, outputFilePath, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, outputMappingArgs, outputFormatArgs, normArgs2, cli2, res2;
     var _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
@@ -280,22 +280,26 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                             variables: args.variables,
                         }];
                 }
-                normArgs2 = __spreadArray(__spreadArray([
+                outputMappingArgs = outputContainer === 'mp3'
+                    ? ['-map', '0:a:0', '-vn', '-sn', '-dn']
+                    : ['-map', '0'];
+                outputFormatArgs = outputContainer === 'mp3' ? ['-f', 'mp3'] : [];
+                normArgs2 = __spreadArray(__spreadArray(__spreadArray(__spreadArray(__spreadArray(__spreadArray([
                     '-i',
-                    args.inputFileObj._id,
-                    '-map',
-                    '0',
+                    args.inputFileObj._id
+                ], outputMappingArgs, true), [
                     '-c',
                     'copy',
                     '-c:a',
                     audioEncoder
-                ], audioBitrateArgs, true), [
+                ], false), audioBitrateArgs, true), [
                     '-af',
                     "loudnorm=print_format=summary:linear=true:I=".concat(inputs_i, ":LRA=").concat(inputs_lra, ":TP=").concat(inputs_tp, ":")
                         + "measured_i=".concat(loudNormValues.input_i, ":")
                         + "measured_lra=".concat(loudNormValues.input_lra, ":")
                         + "measured_tp=".concat(loudNormValues.input_tp, ":")
-                        + "measured_thresh=".concat(loudNormValues.input_thresh, ":offset=").concat(loudNormValues.target_offset),
+                        + "measured_thresh=".concat(loudNormValues.input_thresh, ":offset=").concat(loudNormValues.target_offset)
+                ], false), outputFormatArgs, true), [
                     outputFilePath,
                 ], false);
                 cli2 = new cliUtils_1.CLI({
