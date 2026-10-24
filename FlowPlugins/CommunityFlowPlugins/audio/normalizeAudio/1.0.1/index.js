@@ -113,7 +113,7 @@ var details = function () { return ({
 exports.details = details;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function () {
-    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, isMatroskaWebm, detectedFormatGroup, outputFilePath, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, normArgs2, cli2, res2;
+    var lib, _a, inputs_i, inputs_lra, inputs_tp, maxGain, container, probeData, sourceFormatNames, sourceStreams, sourceAudioStream, hasVideoStream, outputContainer, formatGroups, isMatroskaWebm, detectedFormatGroup, mp4FamilyExtensions, outputFilePath, normArgs1, cli, res, lines, idx, fullTail, targetOffsetIdx, closingBraceIdx, openingBraceIdx, loudNormValues, audioStreamLine, audioCodecMatch, sourceAudioCodec, audioEncoderByCodec, audioEncoder, sourceAudioBitrate, sourceBitrateKbps, losslessCodecs, audioBitrateArgs, gainNeeded, normArgs2, cli2, res2;
     var _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
@@ -161,11 +161,24 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                 else if (detectedFormatGroup) {
                     outputContainer = detectedFormatGroup.extension;
                 }
+                else if (outputContainer === 'mp3' && sourceFormatNames.some(function (name) {
+                    return ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'].includes(name);
+                })) {
+                    // Honor an original .mp3 filename even if FFprobe identifies the input as
+                    // an MP4-family/DASH file. The audio must be encoded as MP3 below because
+                    // AAC audio cannot be muxed into an MP3 container.
+                    outputContainer = 'mp3';
+                }
                 else if (sourceFormatNames.some(function (name) {
                     return ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'].includes(name);
                 })) {
-                    // Use an audio-only MP4-family container for audio-only sources.
-                    outputContainer = hasVideoStream ? (outputContainer === 'mov' ? 'mov' : 'mp4') : 'm4a';
+                    mp4FamilyExtensions = ['mp4', 'm4a', 'mov', '3gp', '3g2', 'mj2'];
+                    if (hasVideoStream) {
+                        outputContainer = outputContainer === 'mov' ? 'mov' : 'mp4';
+                    }
+                    else if (!mp4FamilyExtensions.includes(outputContainer)) {
+                        outputContainer = 'mp4';
+                    }
                 }
                 else if (sourceFormatNames.length > 0 && !sourceFormatNames.includes(outputContainer)) {
                     args.jobLog("Could not map detected container \"".concat(sourceFormatNames.join(','), "\" to a known extension; ")
@@ -240,7 +253,9 @@ var plugin = function (args) { return __awaiter(void 0, void 0, void 0, function
                     opus: 'libopus',
                     wma: 'wmav2',
                 };
-                audioEncoder = audioEncoderByCodec[sourceAudioCodec] || sourceAudioCodec;
+                audioEncoder = outputContainer === 'mp3'
+                    ? 'libmp3lame'
+                    : (audioEncoderByCodec[sourceAudioCodec] || sourceAudioCodec);
                 sourceAudioBitrate = Number(sourceAudioStream === null || sourceAudioStream === void 0 ? void 0 : sourceAudioStream.bit_rate);
                 sourceBitrateKbps = Number.isFinite(sourceAudioBitrate) && sourceAudioBitrate > 0
                     ? Math.round(sourceAudioBitrate / 1000)
