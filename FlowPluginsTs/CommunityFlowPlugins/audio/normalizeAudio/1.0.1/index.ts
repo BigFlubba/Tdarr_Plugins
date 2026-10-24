@@ -148,10 +148,22 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
     outputContainer = container.toLowerCase().replace(/^\./, '') === 'webm' ? 'webm' : 'mkv';
   } else if (detectedFormatGroup) {
     outputContainer = detectedFormatGroup.extension;
+  } else if (outputContainer === 'mp3' && sourceFormatNames.some((name) =>
+    ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'].includes(name))) {
+    // Honor an original .mp3 filename even if FFprobe identifies the input as
+    // an MP4-family/DASH file. The audio must be encoded as MP3 below because
+    // AAC audio cannot be muxed into an MP3 container.
+    outputContainer = 'mp3';
   } else if (sourceFormatNames.some((name) =>
     ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'].includes(name))) {
-    // Use an audio-only MP4-family container for audio-only sources.
-    outputContainer = hasVideoStream ? (outputContainer === 'mov' ? 'mov' : 'mp4') : 'm4a';
+    // Preserve the detected MP4-family container when the original extension
+    // is itself an MP4-family extension.
+    const mp4FamilyExtensions = ['mp4', 'm4a', 'mov', '3gp', '3g2', 'mj2'];
+    if (hasVideoStream) {
+      outputContainer = outputContainer === 'mov' ? 'mov' : 'mp4';
+    } else if (!mp4FamilyExtensions.includes(outputContainer)) {
+      outputContainer = 'mp4';
+    }
   } else if (sourceFormatNames.length > 0 && !sourceFormatNames.includes(outputContainer)) {
     args.jobLog(
       `Could not map detected container "${sourceFormatNames.join(',')}" to a known extension; `
@@ -244,7 +256,9 @@ const plugin = async (args: INormalizeAudioPluginInputArgs): Promise<IpluginOutp
     opus: 'libopus',
     wma: 'wmav2',
   };
-  const audioEncoder = audioEncoderByCodec[sourceAudioCodec] || sourceAudioCodec;
+  const audioEncoder = outputContainer === 'mp3'
+    ? 'libmp3lame'
+    : (audioEncoderByCodec[sourceAudioCodec] || sourceAudioCodec);
 
   // Use ffprobe's audio-stream bitrate, not the overall container bitrate or
   // text parsed from FFmpeg's human-readable log. ffprobe reports bit_rate in bps.
